@@ -185,3 +185,49 @@
     (ok true)
   )
 )
+
+
+  (begin
+    (asserts! (> (len name) u0) (err err-invalid-amount))
+    (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
+    
+    (let
+      (
+        (validator-id (var-get next-validator-id))
+      )
+      (map-set validators { validator-id: validator-id }
+        {
+          address: tx-sender,
+          name: name,
+          reputation: u100
+        }
+      )
+      (var-set next-validator-id (+ validator-id u1))
+      (ok validator-id)
+    )
+  )
+)
+
+(define-public (update-validator-reputation (validator-id uint) (new-reputation uint))
+  (let
+    (
+      (validator (unwrap! (get-validator validator-id) (err err-not-found)))
+    )
+    (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
+    (asserts! (and (>= new-reputation u0) (<= new-reputation u100)) (err err-invalid-amount))
+    
+    (map-set validators { validator-id: validator-id }
+      (merge validator { reputation: new-reputation })
+    )
+    (ok true)
+  )
+)
+
+(define-public (update-platform-fee (new-fee uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
+    (asserts! (and (>= new-fee u0) (<= new-fee u100)) (err err-invalid-amount))
+    (var-set platform-fee new-fee)
+    (ok true)
+  )
+)
