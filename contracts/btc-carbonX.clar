@@ -52,3 +52,64 @@
     error false
   )
 )
+
+(define-private (calculate-fee (amount uint))
+  (/ (* amount (var-get platform-fee)) u1000)
+)
+
+;; Read-Only Functions
+(define-read-only (get-credit (credit-id uint))
+  (match (map-get? credits { credit-id: credit-id })
+    credit (ok credit)
+    (err err-not-found)
+  )
+)
+
+(define-read-only (get-balance (user principal))
+  (default-to u0 (map-get? balances user))
+)
+
+(define-read-only (get-validator (validator-id uint))
+  (match (map-get? validators { validator-id: validator-id })
+    validator (ok validator)
+    (err err-not-found)
+  )
+)
+
+;; Public Functions
+(define-public (create-credit (amount uint) (price uint) (metadata (string-ascii 256)))
+  (let
+    (
+      (credit-id (var-get next-credit-id))
+      (new-credit {
+        owner: tx-sender,
+        amount: amount,
+        price: price,
+        status: "pending",
+        validator: u0,
+        metadata: metadata
+      })
+    )
+    (asserts! (> amount u0) (err err-invalid-amount))
+    (asserts! (> price u0) (err err-invalid-amount))
+    
+    (map-set credits { credit-id: credit-id } new-credit)
+    (var-set next-credit-id (+ credit-id u1))
+    (ok credit-id)
+  )
+)
+
+(define-public (validate-credit (credit-id uint) (validator-id uint) (new-status (string-ascii 20)))
+  (let
+    (
+      (credit (unwrap! (get-credit credit-id) (err err-not-found)))
+      (validator (unwrap! (get-validator validator-id) (err err-not-found)))
+    )
+    (asserts! (is-eq (get address validator) tx-sender) (err err-unauthorized))
+    (asserts! (is-eq (get status credit) "pending") (err err-invalid-status))
+    (map-set credits { credit-id: credit-id }
+      (merge credit { status: new-status, validator: validator-id })
+    )
+    (ok true)
+  )
+)
