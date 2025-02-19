@@ -113,3 +113,75 @@
     (ok true)
   )
 )
+
+(define-public (buy-credit (credit-id uint) (amount uint))
+  (let
+    (
+      (credit (unwrap! (get-credit credit-id) (err err-not-found)))
+      (total-cost (* amount (get price credit)))
+      (fee (calculate-fee total-cost))
+      (seller (get owner credit))
+    )
+    (asserts! (is-eq (get status credit) "validated") (err err-invalid-status))
+    (asserts! (<= amount (get amount credit)) (err err-credit-not-available))
+    (asserts! (>= (stx-get-balance tx-sender) total-cost) (err err-insufficient-balance))
+    
+    (if (and 
+          (transfer-stx-internal total-cost tx-sender seller)
+          (transfer-stx-internal fee seller contract-owner)
+        )
+        (begin
+          (map-set credits { credit-id: credit-id }
+            (merge credit { amount: (- (get amount credit) amount) })
+          )
+          
+          (map-set balances tx-sender
+            (+ (get-balance tx-sender) amount)
+          )
+          
+          (ok true)
+        )
+        (err err-transfer-failed)
+    )
+  )
+)
+
+(define-public (transfer-credits (recipient principal) (amount uint))
+  (begin
+    (asserts! (not (is-eq tx-sender recipient)) (err err-unauthorized))
+    (asserts! (> amount u0) (err err-invalid-amount))
+    
+    (let
+      (
+        (sender-balance (get-balance tx-sender))
+        (recipient-balance (get-balance recipient))
+      )
+      (asserts! (>= sender-balance amount) (err err-insufficient-balance))
+      
+      (map-set balances tx-sender
+        (- sender-balance amount)
+      )
+      (map-set balances recipient
+        (+ recipient-balance amount)
+      )
+      
+      (ok true)
+    )
+  )
+)
+
+(define-public (retire-credits (amount uint))
+  (let
+    (
+      (user-balance (get-balance tx-sender))
+    )
+    (asserts! (> amount u0) (err err-invalid-amount))
+    (asserts! (>= user-balance amount) (err err-insufficient-balance))
+    
+    (map-set balances tx-sender
+      (- user-balance amount)
+    )
+    
+    (ok true)
+  )
+)
