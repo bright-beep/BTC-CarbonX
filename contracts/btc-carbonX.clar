@@ -46,6 +46,7 @@
 )
 
 ;; Private Functions
+;; Transfers STX internally between sender and recipient
 (define-private (transfer-stx-internal (amount uint) (sender principal) (recipient principal))
   (match (stx-transfer? amount sender recipient)
     success true
@@ -53,11 +54,13 @@
   )
 )
 
+;; Calculates the platform fee based on the given amount
 (define-private (calculate-fee (amount uint))
   (/ (* amount (var-get platform-fee)) u1000)
 )
 
 ;; Read-Only Functions
+;; Retrieves the details of a specific credit by its ID
 (define-read-only (get-credit (credit-id uint))
   (match (map-get? credits { credit-id: credit-id })
     credit (ok credit)
@@ -65,10 +68,12 @@
   )
 )
 
+;; Retrieves the balance of a specific user
 (define-read-only (get-balance (user principal))
   (default-to u0 (map-get? balances user))
 )
 
+;; Retrieves the details of a specific validator by its ID
 (define-read-only (get-validator (validator-id uint))
   (match (map-get? validators { validator-id: validator-id })
     validator (ok validator)
@@ -77,6 +82,7 @@
 )
 
 ;; Public Functions
+;; Creates a new carbon offset credit
 (define-public (create-credit (amount uint) (price uint) (metadata (string-ascii 256)))
   (let
     (
@@ -90,6 +96,7 @@
         metadata: metadata
       })
     )
+    ;; Additional input validation
     (asserts! (> amount u0) (err err-invalid-amount))
     (asserts! (> price u0) (err err-invalid-amount))
     
@@ -99,6 +106,7 @@
   )
 )
 
+;; Validates a carbon offset credit by a validator
 (define-public (validate-credit (credit-id uint) (validator-id uint) (new-status (string-ascii 20)))
   (let
     (
@@ -114,6 +122,7 @@
   )
 )
 
+;; Allows a user to buy a carbon offset credit
 (define-public (buy-credit (credit-id uint) (amount uint))
   (let
     (
@@ -126,6 +135,7 @@
     (asserts! (<= amount (get amount credit)) (err err-credit-not-available))
     (asserts! (>= (stx-get-balance tx-sender) total-cost) (err err-insufficient-balance))
     
+    ;; Use explicit error handling for transfers
     (if (and 
           (transfer-stx-internal total-cost tx-sender seller)
           (transfer-stx-internal fee seller contract-owner)
@@ -146,8 +156,10 @@
   )
 )
 
+;; Transfers credits from one user to another
 (define-public (transfer-credits (recipient principal) (amount uint))
   (begin
+    ;; Explicit validation checks
     (asserts! (not (is-eq tx-sender recipient)) (err err-unauthorized))
     (asserts! (> amount u0) (err err-invalid-amount))
     
@@ -170,6 +182,7 @@
   )
 )
 
+;; Retires a specified amount of credits
 (define-public (retire-credits (amount uint))
   (let
     (
@@ -186,8 +199,10 @@
   )
 )
 
-
+;; Adds a new validator to the system
+(define-public (add-validator (name (string-ascii 50)))
   (begin
+    ;; Additional input validation
     (asserts! (> (len name) u0) (err err-invalid-amount))
     (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
     
@@ -208,6 +223,7 @@
   )
 )
 
+;; Updates the reputation of a validator
 (define-public (update-validator-reputation (validator-id uint) (new-reputation uint))
   (let
     (
@@ -223,6 +239,7 @@
   )
 )
 
+;; Updates the platform fee
 (define-public (update-platform-fee (new-fee uint))
   (begin
     (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
